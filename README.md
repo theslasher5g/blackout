@@ -28,7 +28,7 @@ python3 prepare.py --target /pfad/zur/ssd/BLACKOUT --profile small
 |---|---|---|
 | `small` | KI 3B + 7B, dt. Wikipedia, Medizin, Elektronik, DIY, Outdoor, iFixit, Wasser/Erste Hilfe | ~60–80 GB |
 | `standard` | + KI 14B, engl. Wikipedia, WikEM, Appropedia, Kfz, Funk, Garten, OSM Deutschland | ~200–250 GB |
-| `full` | + Wikipedia mit Bildern (de/en) | 400 GB+ |
+| `full` | + Wikipedia mit Bildern (de/en), Kochen, Physik, OSM Europa/AT/CH | ~400–500 GB, passt auf 1 TB |
 
 - Das Skript zeigt vorher alle Dateien mit **echter Größe** und fragt nach.
 - Abbruch/Neustart ist unkritisch (Downloads werden fortgesetzt).

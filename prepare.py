@@ -316,6 +316,10 @@ def main():
     print("\n=== Fertig ===" if not failed else "\n=== Fertig, aber mit Fehlern ===")
     for f in failed:
         print("  fehlgeschlagen:", f, "(Skript erneut ausfuehren setzt fort)")
+    if (target / "docs").exists() and any((target / "docs").iterdir()):
+        import subprocess
+        print("\nIndexiere docs/ ...")
+        subprocess.run([sys.executable, str(target / "app" / "ingest.py")], env={**os.environ, "BLACKOUT_ROOT": str(target)})
     print(f"\nNaechste Schritte:\n  1. Eigene PDFs/Dokumente nach {target / 'docs'} legen\n"
           f"  2. Index bauen:  {target / 'ingest.sh'}   (Windows: ingest.bat)\n"
           f"  3. Starten:      {target / 'start.sh'}    (Windows: start.bat)")
