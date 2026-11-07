@@ -37,7 +37,7 @@ python3 prepare.py --target /pfad/zur/ssd/BLACKOUT --profile small
 - ZIM-Dateien ansehen: `python3 prepare.py list-zim wikipedia`
 
 ## Eingebautes Handbuch (im Repo, ohne Download, ohne KI lesbar)
-`docs/handbook/` enthält 8 selbst geschriebene Kapitel: Sofortmaßnahmen, Wasser, Erste Hilfe, **Funk** (PMR/Freenet/CB/Amateurfunk, Notruf-Ablauf, Antennen, Meshtastic, Morse),
+`docs/handbook/` enthält 13 selbst geschriebene Kapitel (zusätzlich: Pflanzen/Wildnahrung/Konservieren, Bauen/Werkzeug/Knoten, Tiere, Selbstschutz/Evakuierung/Katastrophen, Psyche/Kinder/Gesundheit): Sofortmaßnahmen, Wasser, Erste Hilfe, **Funk** (PMR/Freenet/CB/Amateurfunk, Notruf-Ablauf, Antennen, Meshtastic, Morse),
 **Informatik offline** (Linux/Netzwerk/Backup/Python/Raspberry Pi), Strom & Elektronik, Wärme/Kochen/Hygiene, Navigation.
 In der App unter dem Reiter **Handbuch** durchsuchbar (schnell, stromsparend) und von der KI mit Quellenangabe nutzbar.
 Fremde PDFs (z. B. Armee-Handbücher, BBK) sind nicht im Repo (Urheberrecht/keine Internetverbindung beim Erstellen) – selbst nach `docs/` legen.
