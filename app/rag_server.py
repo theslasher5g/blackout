@@ -15,7 +15,7 @@ LLM = os.environ.get("LLM_URL", "http://127.0.0.1:8081").rstrip("/")
 KIWIX = os.environ.get("KIWIX_URL", "http://127.0.0.1:8080").rstrip("/")
 PORT = int(os.environ.get("UI_PORT", "8000"))
 DB, DOCS = ROOT / "index" / "docs.sqlite", ROOT / "docs"
-MAX_PAGES, PAGE_CHARS, DOC_HITS = 5, 1500, 4
+MAX_PAGES, PAGE_CHARS, DOC_HITS = 5, 1500, 6
 
 SYSTEM = (
     "Du bist BLACKOUT, ein Offline-Notfallassistent ohne Internetzugang. "
@@ -142,7 +142,7 @@ def docs_search(queries, qterms):
                           (match, DOC_HITS)).fetchall()
     except sqlite3.Error:
         return []
-    return [{"title": Path(p).name, "source": "Eigene Dokumente", "url": "/files/" + urllib.parse.quote(p),
+    return [{"title": Path(p).name, "source": "Eigene Dokumente", "url": ("/view/" if p.lower().endswith((".md", ".txt")) else "/files/") + urllib.parse.quote(p),
              "text": t[:PAGE_CHARS], "kind": "doc"} for p, _, t in rows]
 
 
@@ -174,6 +174,60 @@ def build_context(question):
         f1 = ex.submit(docs_search, queries, qterms)
         f2 = ex.submit(kiwix_context, queries, qterms)
         return f1.result() + f2.result()
+
+
+# --------------------------------------------------------- Handbuch (ohne KI)
+def md_inline(t):
+    t = html.escape(t)
+    t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
+    t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+    return re.sub(r"(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)", r"<i>\1</i>", t)
+
+
+def md_to_html(md):
+    out, lst, code, tbl = [], None, False, False
+    def close():
+        nonlocal lst, tbl
+        if lst: out.append(f"</{lst}>"); lst = None
+        if tbl: out.append("</table>"); tbl = False
+    for line in md.splitlines():
+        if line.startswith("```"):
+            close(); out.append("</pre>" if code else "<pre>"); code = not code; continue
+        if code: out.append(html.escape(line)); continue
+        m = re.match(r"(#{1,4})\s+(.*)", line)
+        if m: close(); n = len(m.group(1)); out.append(f"<h{n}>{md_inline(m.group(2))}</h{n}>"); continue
+        if line.startswith(">"): close(); out.append(f"<blockquote>{md_inline(line[1:].strip())}</blockquote>"); continue
+        if line.startswith("|"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if all(re.fullmatch(r":?-{2,}:?", c) for c in cells): continue
+            if not tbl: close(); out.append("<table>"); tbl = True; tag = "th"
+            else: tag = "td"
+            out.append("<tr>" + "".join(f"<{tag}>{md_inline(c)}</{tag}>" for c in cells) + "</tr>"); continue
+        m = re.match(r"\s*([-*]|\d+\.)\s+(.*)", line)
+        if m:
+            kind = "ol" if m.group(1)[0].isdigit() else "ul"
+            if lst != kind: close(); out.append(f"<{kind}>"); lst = kind
+            out.append(f"<li>{md_inline(m.group(2))}</li>"); continue
+        if not line.strip(): close(); continue
+        close(); out.append(f"<p>{md_inline(line)}</p>")
+    close()
+    return "\n".join(out)
+
+
+VIEW = ("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
+        "<title>{t}</title><style>body{{font:17px/1.6 system-ui,sans-serif;max-width:800px;margin:0 auto;padding:16px;"
+        "background:#101214;color:#e8e6e1}}a{{color:#f0a030}}table{{border-collapse:collapse;width:100%;font-size:14px}}"
+        "td,th{{border:1px solid #444;padding:4px 8px;text-align:left}}code,pre{{background:#1a1d21;padding:2px 5px;"
+        "border-radius:4px}}pre{{padding:10px;overflow:auto}}blockquote{{border-left:3px solid #f0a030;margin:0;"
+        "padding:4px 12px;background:#1a1d21}}@media(prefers-color-scheme:light){{body{{background:#f6f4ef;color:#1c1c1c}}"
+        "code,pre,blockquote{{background:#eee}}}}</style><a href='/'>&larr; zurück</a>{b}")
+
+
+def doc_list():
+    if not DOCS.exists():
+        return []
+    return [p.relative_to(DOCS).as_posix() for p in sorted(DOCS.rglob("*"))
+            if p.is_file() and not p.name.lower().startswith("readme.") and not p.name.startswith(".")]
 
 
 # -------------------------------------------------------------------- HTTP
@@ -211,6 +265,18 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, json.dumps({"llm": ok(LLM + "/health"), "kiwix": ok(KIWIX),
                                               "books": [b.get("title") or b["name"] for b in kiwix_books()],
                                               "doc_chunks": n}), "application/json")
+        if path == "/api/docs":
+            return self.send(200, json.dumps(doc_list()), "application/json")
+        if path == "/api/search":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("q", [""])[0]
+            hits = docs_search([q], terms(q))
+            return self.send(200, json.dumps(hits), "application/json")
+        if path.startswith("/view/"):
+            p = (DOCS / urllib.parse.unquote(path[6:])).resolve()
+            if DOCS.resolve() in p.parents and p.suffix.lower() in (".md", ".txt") and p.is_file():
+                txt = p.read_text("utf-8", "replace")
+                body = md_to_html(txt) if p.suffix.lower() == ".md" else "<pre>" + html.escape(txt) + "</pre>"
+                return self.send(200, VIEW.format(t=html.escape(p.name), b=body))
         if path.startswith("/files/"):
             p = (DOCS / urllib.parse.unquote(path[7:])).resolve()
             if DOCS.resolve() in p.parents and p.is_file():

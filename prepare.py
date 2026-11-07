@@ -201,6 +201,8 @@ def copy_app(target):
             shutil.copy2(HERE / f, t / f)
     (t / "start.sh").chmod(0o755)
     (t / "ingest.sh").chmod(0o755)
+    if (HERE / "docs").exists():
+        shutil.copytree(HERE / "docs", t / "docs", dirs_exist_ok=True)
     docs_readme = HERE / "docs" / "README.txt"
     if docs_readme.exists():
         shutil.copy2(docs_readme, t / "docs" / "README.txt")

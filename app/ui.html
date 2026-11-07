@@ -16,12 +16,23 @@ textarea{flex:1;min-width:200px;background:var(--card);color:var(--fg);border:1p
 button{background:var(--acc);color:#111;border:0;border-radius:8px;padding:0 20px;font-weight:600;cursor:pointer;min-height:44px}
 label{font-size:13px;color:var(--mut);display:flex;align-items:center;gap:6px;width:100%}
 </style></head><body>
-<header><h1>BLACKOUT</h1><div id="st">prüfe …</div><a id="kl" href="#" target="_blank">Wissensbibliothek (Kiwix)</a></header>
+<header><h1>BLACKOUT</h1><div id="st">prüfe …</div><a href="#" id="tc">KI-Chat</a><a href="#" id="th">Handbuch</a><a id="kl" href="#" target="_blank">Wissensbibliothek (Kiwix)</a></header>
+<div id="hb" style="display:none;flex:1;overflow:auto;padding:16px;max-width:900px;width:100%;margin:0 auto">
+<input id="hq" placeholder="Handbuch durchsuchen (ohne KI, schnell, stromsparend) …" style="width:100%;padding:12px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--fg);font:inherit">
+<div id="hr"></div><h3>Alle Dokumente</h3><div id="hl"></div></div>
 <div id="log"><div class="m">Offline-Notfallassistent. Frag z. B.: „Wie bereite ich Wasser aus einem Bach auf?“ oder „Mein Netzteil hat keine Ausgangsspannung – wo suche ich?“. Antworten stammen aus der lokalen Wissensbasis, Quellen stehen darunter. Bei Lebensgefahr: 112, wenn erreichbar.</div></div>
 <form id="f"><label><input type="checkbox" id="rag" checked> Wissensbasis durchsuchen (langsamer, aber mit Quellen)</label>
 <textarea id="q" rows="2" placeholder="Frage stellen … (Enter = senden)"></textarea><button>Senden</button></form>
 <script>
-const $=id=>document.getElementById(id),log=$('log'),hist=[],kx=`http://${location.hostname}:8080`;
+const $=id=>document.getElementById(id);const dl=x=>{const a=document.createElement('a');a.href=(/\.(md|txt)$/i.test(x)?'/view/':'/files/')+encodeURI(x);a.target='_blank';a.textContent=x;const d=document.createElement('div');d.className='m';d.append(a);return d};
+fetch('/api/docs').then(r=>r.json()).then(l=>l.forEach(x=>$('hl').append(dl(x))));
+function tab(h){$('hb').style.display=h?'block':'none';$('log').style.display=h?'none':'block';document.querySelector('form').style.display=h?'none':'flex'}
+$('tc').onclick=e=>{e.preventDefault();tab(false)};$('th').onclick=e=>{e.preventDefault();tab(true)};
+let ht;$('hq').oninput=()=>{clearTimeout(ht);ht=setTimeout(async()=>{const q=$('hq').value.trim();$('hr').replaceChildren();if(!q)return;
+const r=await (await fetch('/api/search?q='+encodeURIComponent(q))).json();
+r.forEach(x=>{const d=document.createElement('div');d.className='m';const a=document.createElement('a');a.href=x.url;a.target='_blank';a.textContent=x.title;d.append(a,'\n',x.text.slice(0,350)+' …');$('hr').append(d)});
+if(!r.length)$('hr').textContent='Keine Treffer.'},250)};
+const log=$('log');const hist=[],kx=`http://${location.hostname}:8080`;
 $('kl').href=kx;
 async function status(){try{const s=await (await fetch('/api/status')).json();
 $('st').textContent=`KI: ${s.llm?'bereit':'lädt/aus'} · Kiwix: ${s.kiwix?s.books.length+' Bibliotheken':'aus'} · eigene Abschnitte: ${s.doc_chunks}`}catch(e){$('st').textContent='Server nicht erreichbar'}}
