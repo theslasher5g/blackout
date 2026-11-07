@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BLACKOUT</title>
+<style>
+:root{--bg:#101214;--fg:#e8e6e1;--mut:#8b9096;--card:#1a1d21;--acc:#f0a030;--bd:#2a2e34}
+@media(prefers-color-scheme:light){:root{--bg:#f6f4ef;--fg:#1c1c1c;--mut:#666;--card:#fff;--acc:#b86e00;--bd:#ddd}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;display:flex;flex-direction:column;height:100vh}
+header{padding:10px 16px;border-bottom:1px solid var(--bd);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:18px;margin:0;letter-spacing:.15em;color:var(--acc)}
+#st{font-size:13px;color:var(--mut);flex:1}a{color:var(--acc)}
+#log{flex:1;overflow:auto;padding:16px;max-width:900px;width:100%;margin:0 auto}
+.m{margin:0 0 14px;padding:10px 14px;border-radius:10px;background:var(--card);border:1px solid var(--bd);white-space:pre-wrap;word-wrap:break-word}
+.u{border-left:3px solid var(--acc)}.src{font-size:13px;color:var(--mut);margin-top:8px;white-space:normal}.src a{display:inline-block;margin-right:10px}
+form{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--bd);max-width:900px;width:100%;margin:0 auto;flex-wrap:wrap}
+textarea{flex:1;min-width:200px;background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:8px;padding:10px;font:inherit;resize:none}
+button{background:var(--acc);color:#111;border:0;border-radius:8px;padding:0 20px;font-weight:600;cursor:pointer;min-height:44px}
+label{font-size:13px;color:var(--mut);display:flex;align-items:center;gap:6px;width:100%}
+</style></head><body>
+<header><h1>BLACKOUT</h1><div id="st">prüfe …</div><a id="kl" href="#" target="_blank">Wissensbibliothek (Kiwix)</a></header>
+<div id="log"><div class="m">Offline-Notfallassistent. Frag z. B.: „Wie bereite ich Wasser aus einem Bach auf?“ oder „Mein Netzteil hat keine Ausgangsspannung – wo suche ich?“. Antworten stammen aus der lokalen Wissensbasis, Quellen stehen darunter. Bei Lebensgefahr: 112, wenn erreichbar.</div></div>
+<form id="f"><label><input type="checkbox" id="rag" checked> Wissensbasis durchsuchen (langsamer, aber mit Quellen)</label>
+<textarea id="q" rows="2" placeholder="Frage stellen … (Enter = senden)"></textarea><button>Senden</button></form>
+<script>
+const $=id=>document.getElementById(id),log=$('log'),hist=[],kx=`http://${location.hostname}:8080`;
+$('kl').href=kx;
+async function status(){try{const s=await (await fetch('/api/status')).json();
+$('st').textContent=`KI: ${s.llm?'bereit':'lädt/aus'} · Kiwix: ${s.kiwix?s.books.length+' Bibliotheken':'aus'} · eigene Abschnitte: ${s.doc_chunks}`}catch(e){$('st').textContent='Server nicht erreichbar'}}
+status();setInterval(status,15000);
+function add(cls,t){const d=document.createElement('div');d.className='m '+cls;d.textContent=t;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
+$('q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('f').requestSubmit()}});
+$('f').onsubmit=async e=>{e.preventDefault();const q=$('q').value.trim();if(!q)return;$('q').value='';
+hist.push({role:'user',content:q});add('u',q);const out=add('a','… suche Quellen und denke nach');let txt='';
+try{const r=await fetch('/api/chat',{method:'POST',body:JSON.stringify({messages:hist,use_rag:$('rag').checked})});
+const rd=r.body.getReader(),dec=new TextDecoder();let buf='';
+while(true){const{value,done}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});
+let i;while((i=buf.indexOf('\n\n'))>=0){const ev=buf.slice(0,i);buf=buf.slice(i+2);if(!ev.startsWith('data:'))continue;const o=JSON.parse(ev.slice(5));
+if(o.delta){txt+=o.delta;out.textContent=txt}
+if(o.error){out.textContent=txt+'\n['+o.error+']'}
+if(o.sources&&o.sources.length){const s=document.createElement('div');s.className='src';s.append('Quellen: ');
+o.sources.forEach((x,n)=>{const a=document.createElement('a');a.href=x.kind==='kiwix'?kx+x.url:x.url;a.target='_blank';a.textContent=`[${n+1}] ${x.title} (${x.source})`;s.append(a)});out.after(s)}
+log.scrollTop=log.scrollHeight}}
+}catch(err){out.textContent='Fehler: '+err}
+hist.push({role:'assistant',content:txt})};
+</script></body></html>
